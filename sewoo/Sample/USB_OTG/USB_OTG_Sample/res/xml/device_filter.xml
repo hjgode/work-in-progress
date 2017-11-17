@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <usb-device
+        class="7"
+        product-id="42752"
+        protocol="2"
+        subclass="1"
+        vendor-id="1317" /> <!-- POS Printer -->
+    <usb-device
+        class="7"
+        product-id="42754"
+        protocol="2"
+        subclass="1"
+        vendor-id="1317" /> <!-- Mobile Printer -->
+</resources>

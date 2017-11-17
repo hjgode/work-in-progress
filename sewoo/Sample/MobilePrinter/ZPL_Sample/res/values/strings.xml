@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZPL Tester</string>
+
+<!-- Bluetooth -->	
+	<!--  Button -->
+    <string name="bt_search_btn">Search Bluetooth Devices</string>
+    <string name="bt_stop_search_btn">"Stop Searching Bluetooth Devices"</string>
+    <!--  Tab -->
+    <string name="bt_tab">Bluetooth</string>
+	<!--  Message -->
+	<string name="bt_disconn_msg">"Bluetooth Disconnected"</string>
+	<string name="bt_conn_msg">"Bluetooth Connected"</string>
+	<string name="bt_conn_fail_msg">"Bluetooth Connection Failed"</string>
+	<string name="bt_notconn_msg">"Bluetooth not connected."</string>
+
+<!-- Common -->	
+	<!--  Button -->
+	<string name="dev_conn_btn">"Connect"</string>
+	<string name="dev_disconn_btn">"Disconnect"</string>
+	<!-- Message -->
+	<string name="connecting_msg">"Connecting"</string>
+	<string name="dev_check_msg">"Check the device status or settings."</string>
+	
+<!-- Wi-Fi -->
+    <!--  Tab -->
+    <string name="wifi_tab">"Wi-Fi"</string>
+	<!--  Message -->
+    <string name="wifi_disconn_msg">"Wi-Fi Disconnected"</string>
+	<string name="wifi_conn_msg">"Wi-Fi Connected"</string>
+    <string name="wifi_conn_fail_msg">"Wi-Fi Connection Failed"</string>
+    <string name="wifi_notconn_msg">"Wi-Fi not connected."</string>
+</resources>

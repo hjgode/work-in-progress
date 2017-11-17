@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical" >
+
+    <LinearLayout
+        android:id="@+id/linearLayout1"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content" >
+
+        <ToggleButton
+            android:id="@+id/toggleButtonASB"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textOff="ASB"
+            android:textOn="ASB" />
+
+    </LinearLayout>
+
+    <CheckBox
+        android:id="@+id/checkCashDrawerOpen"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/status_cashdrawer_open" android:clickable="false"/>
+
+    <CheckBox
+        android:id="@+id/checkCoverOpen"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:text="@string/status_cover_open" />
+
+    <CheckBox
+        android:id="@+id/checkPaperNearEnd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:text="@string/status_paper_nearend" />
+
+    <CheckBox
+        android:id="@+id/checkPaperEmpty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/status_paper_empty" android:clickable="false"/>
+
+	<LinearLayout 
+	    android:id="@+id/LinearLayout01" 
+	    android:layout_width="fill_parent" 
+	    android:layout_height="wrap_content">
+    	<Button
+            android:id="@+id/buttonCDOpen"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/status_cashdrawer_open" />
+	</LinearLayout>
+	<LinearLayout 
+	    android:id="@+id/LinearLayout02" 
+	    android:layout_width="fill_parent" 
+	    android:layout_height="wrap_content">
+        <Button
+            android:id="@+id/text_print"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/text_printing" />
+	</LinearLayout>
+	<LinearLayout 
+	    android:id="@+id/LinearLayout03" 
+	    android:layout_width="fill_parent" 
+	    android:layout_height="wrap_content">
+		<Button
+            android:id="@+id/bar1_print"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/barcode1d_printing" />
+	</LinearLayout>
+   	<LinearLayout 
+	    android:id="@+id/LinearLayout04" 
+	    android:layout_width="fill_parent" 
+	    android:layout_height="wrap_content">
+        <Button
+            android:id="@+id/bar2_print"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/barcode2d_printing" />
+	</LinearLayout>
+    
+</LinearLayout>

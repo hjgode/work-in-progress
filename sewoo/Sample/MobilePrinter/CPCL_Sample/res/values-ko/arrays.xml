@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+
+    <string-array name="sizes">
+        <item>Normal</item>
+        <item>Double-width</item>
+        <item>Double-height</item>
+        <item>Quadruple</item>
+    </string-array>
+
+    <string-array name="aligns">
+        <item>왼쪽 정렬</item>
+        <item>가운데 정렬</item>
+        <item>오른쪽 정렬</item>
+    </string-array>
+  
+   	<string-array name="msr_track">
+        <item>Track 1</item>
+        <item>Track 2</item>
+        <item>Track 1,2</item>
+        <item>Track 3</item>
+        <item>Track 2,3</item>
+    </string-array>
+    
+   <string-array name="label_paper">
+        <item>간격이 있는 용지</item>
+        <item>블랙마크 용지</item>
+        <item>연속 용지</item>
+    </string-array>
+    
+</resources>

@@ -1,0 +1,20 @@
+<resources>
+
+    <string name="app_name">ICS_USB_ESCP</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="menu_settings">Settings</string>
+    <string name="title_activity_main">ICS_USB_ESCP</string>
+	<!--  MSR -->
+	<string name="msr_read_btn">"Read MSR"</string>
+    <string name="msr_cancel_btn">"Cancel MSR"</string>
+    <string name="msr_track1">"Track 1"</string>
+    <string name="msr_track2">"Track 2"</string>
+    <string name="msr_track3">"Track 3"</string>
+    <!-- USB -->
+    <string name="dev_search_button">SEARCH</string>
+    <string name="dev_connect_button">OPEN</string>
+    <string name="dev_disconnect_button">CLOSE</string>
+    
+    <string name="usb_tab">USB</string>
+    <string name="msr_tab">MSR</string>
+</resources>

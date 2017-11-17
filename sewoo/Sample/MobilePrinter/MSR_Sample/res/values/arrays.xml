@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+
+    <string-array name="sizes">
+        <item>Normal</item>
+        <item>Double-width</item>
+        <item>Double-height</item>
+        <item>Quadruple</item>
+    </string-array>
+
+    <string-array name="aligns">
+        <item>LEFT</item>
+        <item>CENTER</item>
+        <item>RIGHT</item>
+    </string-array>
+  
+   <string-array name="msr_track">
+        <item>Track 1</item>
+        <item>Track 2</item>
+        <item>Track 1,2</item>
+        <item>Track 3</item>
+        <item>Track 2,3</item>
+    </string-array>
+</resources>
