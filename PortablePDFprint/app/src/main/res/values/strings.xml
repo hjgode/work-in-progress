@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Portable PDF print</string>
+    <!--  Check disconnection -->
+    <string name="dev_check_disconnect">"Check the disconnection and pop-up"</string>
+    <string name="reconnect_msg">"Reconnect bluetooth printer ?"</string>
+    <string name="connect_cancel">"Cancel"</string>
+    <!--  Button -->
+    <string name="dev_conn_btn">"Connect"</string>
+    <string name="dev_disconn_btn">"Disconnect"</string>
 </resources>

@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="artifacts:PDFBox1891-library-debug">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/PDFBox1891-library-debug.aar/28f0124a318ec2def33cc10b0410ebee/jars/classes.jar!/" />
+      <root url="file://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/PDFBox1891-library-debug.aar/28f0124a318ec2def33cc10b0410ebee/res" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

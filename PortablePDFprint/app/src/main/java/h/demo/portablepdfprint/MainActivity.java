@@ -1,7 +1,5 @@
 package h.demo.portablepdfprint;
 
-import android.Manifest;
-import android.app.Activity;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -10,15 +8,11 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Environment;
 import android.os.Looper;
-import android.provider.ContactsContract;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -32,23 +26,23 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.sewoo.jpos.command.CPCLConst;
+import com.sewoo.jpos.printer.CPCLPrinter;
 import com.sewoo.port.android.BluetoothPort;
 import com.sewoo.request.android.RequestHandler;
-import com.tom_roush.pdfbox.*;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.rendering.PDFRenderer;
 import com.tom_roush.pdfbox.text.PDFTextStripper;
 import com.tom_roush.pdfbox.util.PDFBoxResourceLoader;
 
-import org.w3c.dom.Text;
-
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Set;
 import java.util.Vector;
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -59,25 +53,231 @@ public class MainActivity extends AppCompatActivity {
     ImageView imageView;
     File pdfFile = null;
     Bitmap pageImage=null;
+    String pageText="This is PdfPortablePrint\nonly a demo text\nnothing special";
     Thread myThread;
     private Context context;
+    boolean bCheckDisconnect=true;
 
+    ArrayAdapter<String> adapter;
+    private BluetoothAdapter mBluetoothAdapter;
+    private Vector<BluetoothDevice> remoteDevices;
+    private ListView list;
+    private BluetoothPort bluetoothPort;
+    private static final int REQUEST_ENABLE_BT = 2;
+    private static final String dir = Environment.getExternalStorageDirectory().getAbsolutePath() + "//temp";
+    private static final String fileName = dir + "//BTPrinter";
+    private String lastConnAddr;
+    private Thread hThread;
+
+    private Button btnConnect;
+    private Button btnSearch;
+    Button btnPrint;
+
+    EditText btAddrBox;
+    private BroadcastReceiver searchFinish;
+    private BroadcastReceiver searchStart;
+    private BroadcastReceiver discoveryResult;
+    private BroadcastReceiver disconnectReceiver;
+
+    protected CPCLPrinter cpclPrinter;
+    private int paperType;
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        if(cpclPrinter==null)
+            cpclPrinter=new CPCLPrinter();
+
         context = this;
 
+        //check and request permissions
         PermissionsClass permissions = new PermissionsClass(this);
         permissions.checkPermissions();
 
+        //assign layout elements to vars
         setContentView(R.layout.activity_main);
         txtView1 = (TextView) findViewById(R.id.txtView1);
         txtPreview = (TextView) findViewById(R.id.txtPreview);
         txtStatus=(TextView)findViewById(R.id.txtStatus);
         imageView=(ImageView)findViewById(R.id.imageView);
+
+        list = (ListView) findViewById(R.id.BtAddrListView);
+        btnConnect = (Button) findViewById(R.id.ButtonConnectBT);
+        btnSearch = (Button) findViewById(R.id.ButtonSearchBT);
+        btnPrint=(Button)findViewById(R.id.btnPrint);
+        btAddrBox=(EditText)findViewById(R.id.EditTextAddressBT);
+
+        // Setting
+        loadSettingFile();
+
+        bluetoothSetup();
+        //init PDFBox class
         PDFBoxResourceLoader.init(getApplicationContext());
 
-        setupBT();
+        btnPrint.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                doPrint();
+            }
+        });
+        //setupBT();
+        // Connect, Disconnect -- Button
+        btnConnect.setOnClickListener(new View.OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                btnConnect.setEnabled(false);
+                if(!bluetoothPort.isConnected()) // Connect routine.
+                {
+                    try
+                    {
+                        btConn(mBluetoothAdapter.getRemoteDevice(btAddrBox.getText().toString().toUpperCase()));
+                    }
+                    catch(IllegalArgumentException e)
+                    {
+                        // Bluetooth Address Format [OO:OO:OO:OO:OO:OO]
+                        Log.e(TAG,e.getMessage(),e);
+                        AlertView.showAlert(e.getMessage(), context);
+                        return;
+                    }
+                    catch (IOException e)
+                    {
+                        Log.e(TAG,e.getMessage(),e);
+                        AlertView.showAlert(e.getMessage(), context);
+                        return;
+                    }
+                }
+                else // Disconnect routine.
+                {
+                    // Always run.
+                    btDisconn();
+                }
+                btnConnect.setEnabled(true);
+            }
+        });
+        // Search Button
+        btnSearch.setOnClickListener(new View.OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                if (!mBluetoothAdapter.isDiscovering())
+                {
+                    clearBtDevData();
+                    adapter.clear();
+                    mBluetoothAdapter.startDiscovery();
+                    showBTlist(true);
+                }
+                else
+                {
+                    mBluetoothAdapter.cancelDiscovery();
+                    showBTlist(false);
+                }
+            }
+        });
+        // Bluetooth Device List
+        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
+        list.setAdapter(adapter);
+        addPairedDevices();
+        // Connect - click the List item.
+        list.setOnItemClickListener(new AdapterView.OnItemClickListener()
+        {
+            @Override
+            public void onItemClick(AdapterView<?> arg0, View arg1, int arg2, long arg3)
+            {
+                BluetoothDevice btDev = remoteDevices.elementAt(arg2);
+                try
+                {
+                    if(mBluetoothAdapter.isDiscovering())
+                    {
+                        mBluetoothAdapter.cancelDiscovery();
+                    }
+                    btAddrBox.setText(btDev.getAddress());
+                    btConn(btDev);
+                }
+                catch (IOException e)
+                {
+                    AlertView.showAlert(e.getMessage(), context);
+                    return;
+                }
+                showBTlist(false);
+            }
+        });
+        discoveryResult = new BroadcastReceiver()
+        {
+            @Override
+            public void onReceive(Context context, Intent intent)
+            {
+                String key;
+                BluetoothDevice remoteDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if(remoteDevice != null)
+                {
+                    if(remoteDevice.getBondState() != BluetoothDevice.BOND_BONDED)
+                    {
+                        key = remoteDevice.getName() +"\n["+remoteDevice.getAddress()+"]";
+                    }
+                    else
+                    {
+                        key = remoteDevice.getName() +"\n["+remoteDevice.getAddress()+"] [Paired]";
+                    }
+                    if(bluetoothPort.isValidAddress(remoteDevice.getAddress()))
+                    {
+                        remoteDevices.add(remoteDevice);
+                        adapter.add(key);
+                    }
+                }
+            }
+        };
+        registerReceiver(discoveryResult, new IntentFilter(BluetoothDevice.ACTION_FOUND));
+
+        searchStart = new BroadcastReceiver()
+        {
+            @Override
+            public void onReceive(Context context, Intent intent)
+            {
+                btnConnect.setEnabled(false);
+                btAddrBox.setEnabled(false);
+                btnSearch.setText("Stop Search");
+            }
+        };
+        registerReceiver(searchStart, new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_STARTED));
+
+        searchFinish = new BroadcastReceiver()
+        {
+            @Override
+            public void onReceive(Context context, Intent intent)
+            {
+                btnConnect.setEnabled(true);
+                btAddrBox.setEnabled(true);
+                btnSearch.setText("Search");
+            }
+        };
+        registerReceiver(searchFinish, new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED));
+
+        disconnectReceiver = new BroadcastReceiver()
+        {
+            @Override
+            public void onReceive(Context context, Intent intent)
+            {
+                String action = intent.getAction();
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                    //Device is now connected
+					Log.e(TAG, "Connected");
+                    //doPrintText(); //does not work as connection not connected
+                }
+                else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                    //Device has disconnected
+					Log.e(TAG, "Disconnected");
+                    //DialogReconnectionOption();
+                }
+            }
+        };
+        registerReceiver(disconnectReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED));
+        registerReceiver(disconnectReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED));
 
         //have we launched by an Intent?
         Uri data = getIntent().getData();
@@ -89,8 +289,10 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, TAG + " " + fileName, Toast.LENGTH_LONG);
                 Log.d(TAG, "data=" + data);
                 txtView1.setText(fileName);
-                theThread(pdfFile, true);
-//                stripText();
+                //strip text
+//                renderPDF(pdfFile, true); //background
+                renderPDF(pdfFile,false);
+
             } catch (Exception e) {
                 // warn user about bad data here
                 Log.d(TAG, "Exception: " + e.getMessage());
@@ -100,7 +302,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void theThread(final File aFile, final boolean doText) {
+    void doConnect(){
+        try
+        {
+            btConn(mBluetoothAdapter.getRemoteDevice(btAddrBox.getText().toString().toUpperCase()));
+        }
+        catch(IllegalArgumentException e)
+        {
+            // Bluetooth Address Format [OO:OO:OO:OO:OO:OO]
+            Log.e(TAG,e.getMessage(),e);
+            AlertView.showAlert(e.getMessage(), context);
+            return;
+        }
+        catch (IOException e)
+        {
+            Log.e(TAG,e.getMessage(),e);
+            AlertView.showAlert(e.getMessage(), context);
+            return;
+        }
+
+    }
+    public void renderPDF(final File aFile, final boolean doText) {
         if(doText) {
             hideImageView();
             new Thread(new Runnable() {
@@ -125,7 +347,7 @@ public class MainActivity extends AppCompatActivity {
             updateStatus("Mising PDF File. Stopped");
             return bRet;
         }
-//        hideImageView();
+        hideImageView();
 //        disableButtons();
         String parsedText = null;
         PDDocument document = null;
@@ -144,8 +366,9 @@ public class MainActivity extends AppCompatActivity {
                 PDFTextStripper pdfStripper = new PDFTextStripper();
                 pdfStripper.setStartPage(0);
                 pdfStripper.setEndPage(1);
-                parsedText = "Parsed text: " + pdfStripper.getText(document);
+                parsedText=pdfStripper.getText(document);
                 showParsedText(parsedText);
+                pageText=parsedText;
                 updateStatus("READY");
             }
         } catch (Exception e) {
@@ -241,7 +464,9 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+
                 txtStatus.setText(status);
+                Log.d(TAG,status);
             }
         });
     }
@@ -253,6 +478,17 @@ public class MainActivity extends AppCompatActivity {
         ((TextView)findViewById(R.id.txtPreview)).setVisibility(View.VISIBLE);
         ((ImageView)findViewById(R.id.imageView)).setVisibility(View.GONE);
     }
+    void showBTlist(boolean bShow){
+        if(bShow) {
+            ((TextView) findViewById(R.id.txtPreview)).setVisibility(View.GONE);
+            ((ImageView) findViewById(R.id.imageView)).setVisibility(View.GONE);
+            ((ListView)findViewById(R.id.BtAddrListView)).setVisibility(View.VISIBLE);
+        }else{
+            ((TextView) findViewById(R.id.txtPreview)).setVisibility(View.VISIBLE);
+            ((ImageView) findViewById(R.id.imageView)).setVisibility(View.GONE);
+            ((ListView)findViewById(R.id.BtAddrListView)).setVisibility(View.GONE);
+        }
+    }
 
     // ####################### BLUETOOTH STUFF ################################
     @Override
@@ -260,16 +496,12 @@ public class MainActivity extends AppCompatActivity {
     {
         try
         {
-/*
+
             if(bluetoothPort.isConnected() == true)
             {
-                if(chkDisconnect.isChecked())
-                {
-                    unregisterReceiver(disconnectReceiver);
-                }
+                unregisterReceiver(disconnectReceiver);
             }
             saveSettingFile();
-*/
             bluetoothPort.disconnect();
         }
         catch (IOException e)
@@ -291,105 +523,61 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    ArrayAdapter<String> adapter;
-    private BluetoothAdapter mBluetoothAdapter;
-    private Vector<BluetoothDevice> remoteDevices;
-    private ListView list;
-    private BluetoothPort bluetoothPort;
-    private static final int REQUEST_ENABLE_BT = 2;
-    private String lastConnAddr;
-    private Thread hThread;
-    private Button connectButton;
-    private Button searchButton;
-    EditText btAddrBox;
-    private BroadcastReceiver searchFinish;
-    private BroadcastReceiver searchStart;
-    private BroadcastReceiver discoveryResult;
+    private void loadSettingFile()
+    {
+        int rin = 0;
+        char [] buf = new char[128];
+        try
+        {
+            FileReader fReader = new FileReader(fileName);
+            rin = fReader.read(buf);
+            if(rin > 0)
+            {
+                lastConnAddr = new String(buf,0,rin);
+                btAddrBox.setText(lastConnAddr);
+            }
+            fReader.close();
+        }
+        catch (FileNotFoundException e)
+        {
+            Log.i(TAG, "Connection history not exists.");
+        }
+        catch (IOException e)
+        {
+            Log.e(TAG, e.getMessage(), e);
+        }
+    }
 
-    void setupBT(){
-        list = (ListView) findViewById(R.id.BtAddrListView);
-        connectButton = (Button) findViewById(R.id.ButtonConnectBT);
-        searchButton = (Button) findViewById(R.id.ButtonSearchBT);
-        btAddrBox=(EditText)findViewById(R.id.EditTextAddressBT);
-        bluetoothPort = BluetoothPort.getInstance();
+    private void saveSettingFile()
+    {
+        try
+        {
+            File tempDir = new File(dir);
+            if(!tempDir.exists())
+            {
+                tempDir.mkdir();
+            }
+            FileWriter fWriter = new FileWriter(fileName);
+            if(lastConnAddr != null)
+                fWriter.write(lastConnAddr);
+            fWriter.close();
+        }
+        catch (FileNotFoundException e)
+        {
+            Log.e(TAG, e.getMessage(), e);
+        }
+        catch (IOException e)
+        {
+            Log.e(TAG, e.getMessage(), e);
+        }
+    }
+
+    // Set up Bluetooth.
+    private void bluetoothSetup()
+    {
         // Initialize
         clearBtDevData();
-        // Connect, Disconnect -- Button
-        connectButton.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-                if(!bluetoothPort.isConnected()) // Connect routine.
-                {
-                    try
-                    {
-                        btConn(mBluetoothAdapter.getRemoteDevice(btAddrBox.getText().toString().toUpperCase()));
-                    }
-                    catch(IllegalArgumentException e)
-                    {
-                        // Bluetooth Address Format [OO:OO:OO:OO:OO:OO]
-                        Log.e(TAG,e.getMessage(),e);
-                        AlertView.showAlert(e.getMessage(), context);
-                        return;
-                    }
-                    catch (IOException e)
-                    {
-                        Log.e(TAG,e.getMessage(),e);
-                        AlertView.showAlert(e.getMessage(), context);
-                        return;
-                    }
-                }
-                else // Disconnect routine.
-                {
-                    // Always run.
-                    btDisconn();
-                }
-            }
-        });
-        // Search Button
-        searchButton.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-                if (!mBluetoothAdapter.isDiscovering())
-                {
-                    clearBtDevData();
-                    adapter.clear();
-                    mBluetoothAdapter.startDiscovery();
-                }
-                else
-                {
-                    mBluetoothAdapter.cancelDiscovery();
-                }
-            }
-        });
-        // Connect - click the List item.
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener()
-        {
-            @Override
-            public void onItemClick(AdapterView<?> arg0, View arg1, int arg2, long arg3)
-            {
-                BluetoothDevice btDev = remoteDevices.elementAt(arg2);
-                try
-                {
-                    if(mBluetoothAdapter.isDiscovering())
-                    {
-                        mBluetoothAdapter.cancelDiscovery();
-                    }
-                    btAddrBox.setText(btDev.getAddress());
-                    btConn(btDev);
-                }
-                catch (IOException e)
-                {
-                    AlertView.showAlert(e.getMessage(), context);
-                    return;
-                }
-            }
-        });
-
-
+        bluetoothPort = BluetoothPort.getInstance();
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBluetoothAdapter == null)
         {
@@ -401,63 +589,8 @@ public class MainActivity extends AppCompatActivity {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
         }
-        // Bluetooth Device List
-        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
-        list.setAdapter(adapter);
-        addPairedDevices();
-
-        // UI - Event Handler.
-        // Search device, then add List.
-        discoveryResult = new BroadcastReceiver()
-        {
-            @Override
-            public void onReceive(Context context, Intent intent)
-            {
-                String key;
-                BluetoothDevice remoteDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if(remoteDevice != null)
-                {
-                    if(remoteDevice.getBondState() != BluetoothDevice.BOND_BONDED)
-                    {
-                        key = remoteDevice.getName() +"\n["+remoteDevice.getAddress()+"]";
-                    }
-                    else
-                    {
-                        key = remoteDevice.getName() +"\n["+remoteDevice.getAddress()+"] [Paired]";
-                    }
-                    if(bluetoothPort.isValidAddress(remoteDevice.getAddress()))
-                    {
-                        remoteDevices.add(remoteDevice);
-                        adapter.add(key);
-                    }
-                }
-            }
-        };
-        registerReceiver(discoveryResult, new IntentFilter(BluetoothDevice.ACTION_FOUND));
-        searchStart = new BroadcastReceiver()
-        {
-            @Override
-            public void onReceive(Context context, Intent intent)
-            {
-                connectButton.setEnabled(false);
-                btAddrBox.setEnabled(false);
-                searchButton.setText("Stop Search");
-            }
-        };
-        registerReceiver(searchStart, new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_STARTED));
-        searchFinish = new BroadcastReceiver()
-        {
-            @Override
-            public void onReceive(Context context, Intent intent)
-            {
-                connectButton.setEnabled(true);
-                btAddrBox.setEnabled(true);
-                searchButton.setText("Search");
-            }
-        };
-        registerReceiver(searchFinish, new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED));
-
     }
+
     // Bluetooth Connection method.
     private void btConn(final BluetoothDevice btDev) throws IOException
     {
@@ -483,10 +616,10 @@ public class MainActivity extends AppCompatActivity {
         if((hThread != null) && (hThread.isAlive()))
             hThread.interrupt();
         // UI
-        connectButton.setText("Connect");
+        btnConnect.setText("Connect");
         list.setEnabled(true);
         btAddrBox.setEnabled(true);
-        searchButton.setEnabled(true);
+        btnSearch.setEnabled(true);
         Toast toast = Toast.makeText(context, "Bluetooth disconnected", Toast.LENGTH_SHORT);
         toast.show();
     }
@@ -508,17 +641,21 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected Integer doInBackground(BluetoothDevice... params)
         {
+            updateStatus("doInBackground(BluetoothDevice...");
             Integer retVal = null;
             try
             {
+                updateStatus("doInBackground() connect()...");
                 bluetoothPort.connect(params[0]);
+                updateStatus("doInBackground() connect() done");
 
                 lastConnAddr = params[0].getAddress();
                 retVal = Integer.valueOf(0);
+//                doPrintText(); //makes the app crash
             }
             catch (IOException e)
             {
-                Log.e(TAG, e.getMessage());
+                Log.e(TAG, "doInBackground(BluetoothDevice"+e.getMessage());
                 retVal = Integer.valueOf(-1);
             }
             return retVal;
@@ -529,24 +666,25 @@ public class MainActivity extends AppCompatActivity {
         {
             if(result.intValue() == 0)	// Connection success.
             {
+                //sewoo RequestHandler?!
                 RequestHandler rh = new RequestHandler();
                 hThread = new Thread(rh);
                 hThread.start();
                 // UI
-                connectButton.setText("Disconnect");
+                btnConnect.setText("Disconnect");
                 list.setEnabled(false);
                 btAddrBox.setEnabled(false);
-                searchButton.setEnabled(false);
+                btnSearch.setEnabled(false);
                 if(dialog.isShowing())
                     dialog.dismiss();
                 Toast toast = Toast.makeText(MainActivity.this, "Bluetooth connected", Toast.LENGTH_SHORT);
                 toast.show();
+                //doPrintText();
+                //renderPDF(pdfFile, false);
+//                doPrint();//rashes app
 /*
-                if(chkDisconnect.isChecked())
-                {
-                    registerReceiver(disconnectReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED));
-                    registerReceiver(disconnectReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED));
-                }
+                registerReceiver(disconnectReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED));
+                registerReceiver(disconnectReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED));
 */
             }
             else	// Connection failed.
@@ -558,6 +696,52 @@ public class MainActivity extends AppCompatActivity {
             }
             super.onPostExecute(result);
         }
+    }
+    // Display the dialog when bluetooth disconnected.
+    private void DialogReconnectionOption()
+    {
+        final String [] items			= new String [] {"Bluetooth printer"};
+        android.app.AlertDialog.Builder builder		= new android.app.AlertDialog.Builder(this);
+        builder.setTitle(getResources().getString(R.string.reconnect_msg));
+        builder.setSingleChoiceItems(items, 0, new DialogInterface.OnClickListener()
+        {
+            public void onClick(DialogInterface dialog, int whichButton)
+            {
+            }
+        }).setPositiveButton(getResources().getString(R.string.dev_conn_btn), new DialogInterface.OnClickListener()
+        {
+            public void onClick(DialogInterface dialog, int whichButton)
+            {
+                try
+                {
+                    // Disconnect routine.
+                    btDisconn();
+                    btConn(mBluetoothAdapter.getRemoteDevice(btAddrBox.getText().toString()));
+                }
+                catch(IllegalArgumentException e)
+                {
+                    // Bluetooth Address Format [OO:OO:OO:OO:OO:OO]
+                    Log.e(TAG,e.getMessage(),e);
+                    AlertView.showAlert(e.getMessage(), context);
+                    return;
+                }
+                catch (IOException e)
+                {
+                    Log.e(TAG,e.getMessage(),e);
+                    AlertView.showAlert(e.getMessage(), context);
+                    return;
+                }
+            }
+        }).setNegativeButton(getResources().getString(R.string.connect_cancel), new DialogInterface.OnClickListener()
+        {
+            public void onClick(DialogInterface dialog, int whichButton)
+            {
+                // Cancel
+                // Disconnect routine.
+                btDisconn();
+            }
+        });
+        builder.show();
     }
 
     // clear device data used list.
@@ -580,4 +764,134 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
+    void doPrintText(){
+        updateStatus("doPrintText() started...");
+        if(pageText==null | pageText.length()==0) {
+            Toast.makeText(this, "doPrint(): No Text found!",Toast.LENGTH_LONG);
+            updateStatus("doPrint(): No Text found!");
+            return;
+        }
+        if(!bluetoothPort.isConnected()){
+            Toast.makeText(this, "doPrint(): No BT connection!",Toast.LENGTH_LONG);
+            updateStatus("doPrint(): No BT connection!");
+
+            return;
+        }
+        updateStatus("doPrintText() New CPCLprinter?...");
+        //bluetooth should be already connected?!
+        if(cpclPrinter==null) {
+            cpclPrinter = new CPCLPrinter();
+            Log.d(TAG, "doPrintText() new CPCLPrinter() created");
+        }
+
+        disableButtons();
+        updateStatus("doPrintText() setup form");
+        try {
+            int cstatus, pstatus;
+            cstatus = cpclPrinter.printerCheck(200);
+            if(cstatus != 0)
+            {
+                Log.e(TAG,"printerCheck error");
+                updateStatus("PrinterCheck error: "+cstatus);
+            }
+            cstatus = cpclPrinter.status();
+            if(cstatus != 0)
+            {
+                Log.e(TAG,"Printer is error");
+                updateStatus("Printer status error: "+cstatus);
+            }
+/*
+            paperType = CPCLConst.LK_CPCL_CONTINUOUS;
+            cpclPrinter.setForm(0, 200, 200, 500, 1);
+            cpclPrinter.setMedia(paperType);
+*/
+            updateStatus("doPrintText() printing text...");
+/*
+            cpclPrinter.setMultiLine(45);
+            cpclPrinter.multiLineText(0, 1, 0, 10, 10);
+            cpclPrinter.multiLineData(pageText);
+            cpclPrinter.resetMultiLine();
+*/
+            String testString="! 0 200 200 210 1\n" +
+                    "TEXT 4 0 30 40 Hello World\n" +
+                    "FORM\n" +
+                    "PRINT";
+            cpclPrinter.sendByte(testString.getBytes());
+/*
+            cpclPrinter.printCPCLText(0, 5, 2, 130, 140, "SEWOO TECH CO.,LTD.", 0);
+            cpclPrinter.printCPCLText(0, 0, 3, 130, 210, "Dalim Plaza 304, 1027-20,", 0);
+            cpclPrinter.printCPCLText(0, 0, 3, 130, 250, "Hogye-dong, Dongan-gu, Anyang-si,", 0);
+            cpclPrinter.printCPCLText(0, 0, 3, 130, 290, "Gyeonggi-do, 431-848, Korea", 0);
+            // Telephone
+            cpclPrinter.printCPCLText(CPCLConst.LK_CPCL_0_ROTATION, 7, 1, 130, 340, "TEL : 82-31-387-0101", 0);
+            // Homepage
+            cpclPrinter.printCPCLText(CPCLConst.LK_CPCL_0_ROTATION, 7, 1, 310, 400, "www.miniprinter.com", 0);
+            cpclPrinter.printCPCLText(CPCLConst.LK_CPCL_0_ROTATION, 1, 1, 310, 470, "<-- Check This.", 0);
+            updateStatus("doPrintText() printing form");
+            cpclPrinter.printForm();
+*/
+        }catch (Exception ex){
+
+        }
+        enableButtons();
+        updateStatus("doPrintText() READY");
+    }
+
+    void doPrint(){
+        int count=1;
+        if(pageImage==null) {
+            Toast.makeText(this, "doPrint(): No Image found!",Toast.LENGTH_LONG);
+            updateStatus("doPrint(): No Image found!");
+            return;
+        }
+        if(!bluetoothPort.isConnected()){
+            Toast.makeText(this, "doPrint(): No BT connection!",Toast.LENGTH_LONG);
+            updateStatus("doPrint(): No BT connection!");
+            return;
+        }
+
+        //bluetooth should be already connected?!
+        if(cpclPrinter==null)
+            cpclPrinter=new CPCLPrinter();
+
+        disableButtons();
+
+        paperType = CPCLConst.LK_CPCL_CONTINUOUS;
+        int lblHeigth=pageImage.getHeight()+10;
+        cpclPrinter.setForm(0, 200, 200, lblHeigth, count);
+        cpclPrinter.setMedia(paperType);
+        try {
+            int cstatus, pstatus;
+            cstatus = cpclPrinter.printerCheck();
+            if(cstatus != 0)
+            {
+                Log.e(TAG,"printerCheck error");
+                updateStatus("PrinterCheck error: "+cstatus);
+                return;
+            }
+            cstatus = cpclPrinter.status();
+            if(cstatus != 0)
+            {
+                Log.e(TAG,"Printer is error");
+                updateStatus("Printer status error: "+cstatus);
+                return;
+            }
+
+            cpclPrinter.printBitmap(pageImage,1,1);
+            cpclPrinter.printForm();
+        }catch (Exception ex){
+
+        }
+        enableButtons();
+    }
+    void disableButtons(){
+        btnConnect.setEnabled(false);
+        btnSearch.setEnabled(false);
+    }
+    void enableButtons(){
+        btnConnect.setEnabled(true);
+        btnSearch.setEnabled(true);
+    }
+
 }

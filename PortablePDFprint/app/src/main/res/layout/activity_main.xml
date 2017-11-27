@@ -25,45 +25,67 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="100px"
-        android:orientation="horizontal">
+        android:orientation="vertical">
 
-        <EditText
-            android:id="@+id/EditTextAddressBT"
-            android:layout_width="200px"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="00:03:7a:31:9c:3a" />
+        <LinearLayout
+            android:id="@+id/btPanel"
+            android:layout_width="match_parent"
+            android:layout_height="100px"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/ButtonConnectBT"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Connect" />
+            <EditText
+                android:id="@+id/EditTextAddressBT"
+                android:layout_width="200px"
+                android:layout_height="wrap_content"
+                android:layout_weight="8"
+                android:text="00:03:7a:31:9c:3a" />
 
-        <Button
-            android:id="@+id/ButtonSearchBT"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Search" />
+            <Button
+                android:id="@+id/ButtonConnectBT"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Connect" />
+
+            <Button
+                android:id="@+id/ButtonSearchBT"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Search" />
+
+        </LinearLayout>
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/txtPreview"
+
         android:layout_width="match_parent"
-        android:layout_height="200px"
-        android:text="Text View" />
+        android:layout_height="38dp"
+        android:layout_weight="8">
+
+        <Button
+            android:id="@+id/btnPrint"
+            android:layout_width="200px"
+            android:layout_height="100px"
+            android:text="Print" />
+
+
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="match_parent"
-        android:layout_height="200px"
+        android:layout_height="400px"
         app:srcCompat="@mipmap/ic_launcher" />
+
+    <TextView
+        android:id="@+id/txtPreview"
+        android:layout_width="match_parent"
+        android:layout_height="400px"
+        android:layout_weight="1"
+        android:text="Text View" />
 
     <ListView
         android:id="@+id/BtAddrListView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="400px" />
 
 </LinearLayout>

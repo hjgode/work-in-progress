@@ -1,0 +1,31 @@
+apply plugin: 'com.android.application'
+
+android {
+    signingConfigs {
+    }
+    compileSdkVersion 26
+    buildToolsVersion "26.0.2"
+    defaultConfig {
+        applicationId "com.mobile.app.cpcl"
+        minSdkVersion 19
+        targetSdkVersion 26
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    productFlavors {
+    }
+}
+
+dependencies {
+    implementation files('libs/Sewoo_Android_1093.jar')
+    implementation project(':PDFBox1891-library-debug')
+    implementation 'com.android.support:appcompat-v7:26.1.0'
+}
